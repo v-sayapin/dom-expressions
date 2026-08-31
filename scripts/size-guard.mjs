@@ -299,11 +299,14 @@ const SCENARIOS = {
   // the warm resident store so a later mount receives every link. The
   // document/client scenarios stay byte-identical; only frame consumers pay.
   // Re-guarded at actual+20 (9739 measured).
+  // Then +15 for responsive image preloads without href: frame consumers
+  // locate and create them by imagesrcset, while href preloads keep the same
+  // path. Re-guarded at actual+20 (9754 measured).
   "frames: full consumer (runtime + transport + codec glue)": [
     `export * from ${JSON.stringify(FRAME_CLIENT)};
      export * from ${JSON.stringify(FRAME_TRANSPORT)};
      export { createJSONDataTable } from ${JSON.stringify(SERIALIZER_DECODE)};`,
-    9759
+    9774
   ]
 };
 

@@ -12,10 +12,7 @@ export const Namespaces: Record<string, string>;
 
 type MountableElement = Element | Document | ShadowRoot | DocumentFragment | Node;
 
-/** An explicit `<link rel="preload">` emitted by the SSR asset pipeline. */
-export type PreloadLink = {
-  href: string;
-  as: JSX.HTMLPreloadAs;
+type PreloadLinkAttributes = {
   type?: string;
   crossorigin?: JSX.HTMLCrossorigin;
   integrity?: string;
@@ -23,6 +20,33 @@ export type PreloadLink = {
   fetchpriority?: JSX.HTMLFetchPriority;
   media?: string;
 };
+
+/**
+ * An explicit `<link rel="preload">` emitted by the SSR asset pipeline.
+ * `imagesrcset` candidates must already be resolved and paired with
+ * `imagesizes` when required.
+ */
+export type PreloadLink = PreloadLinkAttributes &
+  (
+    | {
+        href: string;
+        as: Exclude<JSX.HTMLPreloadAs, "image">;
+        imagesrcset?: never;
+        imagesizes?: never;
+      }
+    | {
+        href: string;
+        as: "image";
+        imagesrcset?: string;
+        imagesizes?: string;
+      }
+    | {
+        href?: never;
+        as: "image";
+        imagesrcset: string;
+        imagesizes?: string;
+      }
+  );
 
 /** Bundler-agnostic static asset graph compatible with Vite client manifests. */
 export type AssetManifest = Record<

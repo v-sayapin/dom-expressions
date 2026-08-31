@@ -1285,7 +1285,14 @@ describe("manifest-driven asset resolution", () => {
             href: "hero.avif",
             as: "image",
             type: "image/avif",
-            fetchpriority: "high"
+            fetchpriority: "high",
+            imagesrcset: "/cdn/hero.avif 1x, /cdn/hero@2x.avif 2x",
+            imagesizes: "50vw"
+          },
+          {
+            as: "image",
+            imagesrcset: "/cdn/hero-400.avif 400w, /cdn/hero-800.avif 800w",
+            imagesizes: "100vw"
           }
         ]
       },
@@ -1320,7 +1327,14 @@ describe("manifest-driven asset resolution", () => {
         href: "/assets/hero.avif",
         as: "image",
         type: "image/avif",
-        fetchpriority: "high"
+        fetchpriority: "high",
+        imagesrcset: "/cdn/hero.avif 1x, /cdn/hero@2x.avif 2x",
+        imagesizes: "50vw"
+      },
+      {
+        as: "image",
+        imagesrcset: "/cdn/hero-400.avif 400w, /cdn/hero-800.avif 800w",
+        imagesizes: "100vw"
       },
       {
         href: "/assets/fonts/app.woff2?v=1",
@@ -1330,13 +1344,18 @@ describe("manifest-driven asset resolution", () => {
       }
     ]);
     expect(html).toContain(
-      '<link rel="preload" href="/assets/hero.avif" as="image" type="image/avif" fetchpriority="high">'
+      '<link rel="preload" href="/assets/hero.avif" as="image" type="image/avif" fetchpriority="high" imagesrcset="/cdn/hero.avif 1x, /cdn/hero@2x.avif 2x" imagesizes="50vw">'
+    );
+    expect(html).toContain(
+      '<link rel="preload" as="image" imagesrcset="/cdn/hero-400.avif 400w, /cdn/hero-800.avif 800w" imagesizes="100vw">'
     );
     expect(html).toContain(
       '<link rel="preload" href="/assets/fonts/app.woff2?v=1" as="font" type="font/woff2" crossorigin="">'
     );
     expect(html).not.toContain("hidden.webp");
     expect(html).not.toContain("not-automatically-preloaded.png");
+    resolved.preloads[1].imagesizes = "50vw";
+    expect(manifest["app.tsx"].preloads[2].imagesizes).toBe("100vw");
   });
 
   it("context.resolveAssets returns null for unknown module urls", () => {
@@ -2140,7 +2159,9 @@ describe("typed preload links", () => {
           integrity: "sha384-image",
           referrerpolicy: "no-referrer",
           fetchpriority: "high",
-          media: "(min-width: 60rem)"
+          media: "(min-width: 60rem)",
+          imagesrcset: "/hero.avif 1x, /hero@2x.avif 2x",
+          imagesizes: "50vw"
         };
         ctx.registerAsset("preload", image);
         ctx.registerAsset("preload", image);
@@ -2165,9 +2186,38 @@ describe("typed preload links", () => {
     expect(image).toContain('referrerpolicy="no-referrer"');
     expect(image).toContain('fetchpriority="high"');
     expect(image).toContain('media="(min-width: 60rem)"');
+    expect(image).toContain('imagesrcset="/hero.avif 1x, /hero@2x.avif 2x"');
+    expect(image).toContain('imagesizes="50vw"');
     expect(image).not.toContain("nonce");
     expect(html.match(/crossorigin=""/g)).toHaveLength(1);
     expect(html).not.toContain("sha384-conflict");
+  });
+
+  it("renders and dedupes responsive image preloads without href", () => {
+    const link = {
+      as: "image",
+      imagesrcset: '/hero-small.avif 480w, /hero-large.avif?crop="wide" 960w',
+      imagesizes: "100vw"
+    };
+    const html = r.renderToString(() => {
+      const ctx = sharedConfig.context;
+      ctx.registerAsset("preload", link);
+      ctx.registerAsset("preload", link);
+      r.useHead({ tag: "link", props: { rel: "preload", ...link } });
+      ctx.registerAsset("preload", {
+        ...link,
+        imagesrcset: "/other-small.avif 480w, /other-large.avif 960w"
+      });
+      return r.ssr`<html><head></head><body></body></html>`;
+    });
+
+    expect(html.match(/imagesrcset=/g)).toHaveLength(2);
+    expect(html).toContain(
+      '<link rel="preload" as="image" imagesrcset="/hero-small.avif 480w, /hero-large.avif?crop=&quot;wide&quot; 960w" imagesizes="100vw">'
+    );
+    expect(html).toContain(
+      'imagesrcset="/other-small.avif 480w, /other-large.avif 960w" imagesizes="100vw"'
+    );
   });
 
   it("warns once for each emitted font or fetch preload without crossorigin", () => {
@@ -2251,6 +2301,17 @@ describe("typed preload links", () => {
         ctx.registerAsset("preload", "/untyped.bin");
         ctx.registerAsset("preload", { href: "/missing-as.bin" });
         ctx.registerAsset("preload", { href: "/invalid.bin", as: " style " });
+        ctx.registerAsset("preload", {
+          href: "/script.js",
+          as: "script",
+          imagesrcset: "/script-2x.js 2x"
+        });
+        ctx.registerAsset("preload", {
+          href: "/style.css",
+          as: "style",
+          imagesizes: "100vw"
+        });
+        ctx.registerAsset("preload", { href: "", as: "image", imagesrcset: "" });
         return r.ssr`<html><head></head><body></body></html>`;
       });
     } finally {
@@ -2260,7 +2321,9 @@ describe("typed preload links", () => {
     expect(html).not.toContain("untyped.bin");
     expect(html).not.toContain("missing-as.bin");
     expect(html).not.toContain("invalid.bin");
-    expect(warningCount).toBe(3);
+    expect(html).not.toContain("script-2x.js");
+    expect(html).not.toContain("style.css");
+    expect(warningCount).toBe(6);
   });
 
   it("emits a link registered after the shell without waiting for its boundary", async () => {

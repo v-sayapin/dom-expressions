@@ -249,6 +249,11 @@ describe("renderToFrameStream chunk sequences", () => {
         });
         ctx.registerAsset("preload", { href: "/critical.js", as: "script" });
         ctx.registerAsset("preload", { href: "/critical.css", as: "style" });
+        ctx.registerAsset("preload", {
+          as: "image",
+          imagesrcset: "/hero-480.avif 480w, /hero-960.avif 960w",
+          imagesizes: "100vw"
+        });
         return r.ssr`<div>app</div>`;
       },
       {
@@ -263,7 +268,14 @@ describe("renderToFrameStream chunk sequences", () => {
         attrs: { as: "font", type: "font/woff2", crossorigin: "" }
       },
       { href: "/critical.js", attrs: { as: "script", nonce: "script-nonce" } },
-      { href: "/critical.css", attrs: { as: "style", nonce: "style-nonce" } }
+      { href: "/critical.css", attrs: { as: "style", nonce: "style-nonce" } },
+      {
+        attrs: {
+          as: "image",
+          imagesrcset: "/hero-480.avif 480w, /hero-960.avif 960w",
+          imagesizes: "100vw"
+        }
+      }
     ]);
     expect(chunks.indexOf(assets)).toBeLessThan(typeIndex(chunks, "html"));
   });

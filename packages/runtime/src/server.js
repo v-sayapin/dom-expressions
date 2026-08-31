@@ -105,9 +105,10 @@ function resolveAssets(moduleUrl, manifest) {
     if (e.preloads) {
       for (let i = 0; i < e.preloads.length; i++) {
         const link = e.preloads[i];
-        if (!link || typeof link.href !== "string" || !link.href) continue;
+        const href = link && typeof link.href === "string" && link.href;
+        if (!href && (!link || typeof link.imagesrcset !== "string" || !link.imagesrcset)) continue;
         if (!preloads) preloads = [];
-        preloads.push({ ...link, href: joinAssetPath(base, link.href) });
+        preloads.push(href ? { ...link, href: joinAssetPath(base, href) } : { ...link });
       }
     }
     if (e.imports) for (let i = 0; i < e.imports.length; i++) walk(e.imports[i]);
@@ -314,13 +315,20 @@ const PRELOAD_LINK_ATTRIBUTES = [
   "integrity",
   "referrerpolicy",
   "fetchpriority",
-  "media"
+  "media",
+  "imagesrcset",
+  "imagesizes"
 ];
 
 // Normalize once for document/frame output and dedupe with useHead resources.
 function registerPreloadLink(tracking, headRegistry, link, nonce) {
-  if (!link || typeof link !== "object" || typeof link.href !== "string" || !link.href) {
-    if ("_DX_DEV_") console.warn('registerAsset("preload") requires a non-empty string href.');
+  const href = link && typeof link === "object" && typeof link.href === "string" && link.href;
+  if (
+    !href &&
+    (!link || typeof link !== "object" || typeof link.imagesrcset !== "string" || !link.imagesrcset)
+  ) {
+    if ("_DX_DEV_")
+      console.warn('registerAsset("preload") requires a non-empty string href or imagesrcset.');
     return null;
   }
   if (typeof link.as !== "string") {
@@ -346,7 +354,18 @@ function registerPreloadLink(tracking, headRegistry, link, nonce) {
         );
       return null;
   }
-  const props = { rel: "preload", href: link.href, as };
+  if (
+    as !== "image" &&
+    ((link.imagesrcset != null && link.imagesrcset !== false) ||
+      (link.imagesizes != null && link.imagesizes !== false))
+  ) {
+    if ("_DX_DEV_")
+      console.warn(
+        'registerAsset("preload") only supports imagesrcset and imagesizes with as="image".'
+      );
+    return null;
+  }
+  const props = { rel: "preload", href: href || undefined, as };
   for (let i = 0; i < PRELOAD_LINK_ATTRIBUTES.length; i++) {
     const name = PRELOAD_LINK_ATTRIBUTES[i];
     const value = link[name];

@@ -448,7 +448,22 @@ describe("renderServerComponent (slot emission)", () => {
               href: "/shared.bin",
               attrs: { as: "image", type: "image/avif", fetchpriority: "high" }
             },
-            { href: "/shared.bin", attrs: { as: "fetch", crossorigin: "anonymous" } }
+            { href: "/shared.bin", attrs: { as: "fetch", crossorigin: "anonymous" } },
+            {
+              href: "/card-fallback.avif",
+              attrs: {
+                as: "image",
+                imagesrcset: "/card.avif 1x, /card@2x.avif 2x",
+                imagesizes: "20rem"
+              }
+            },
+            {
+              attrs: {
+                as: "image",
+                imagesrcset: "/card.avif 1x, /card@2x.avif 2x",
+                imagesizes: "20rem"
+              }
+            }
           ]
         }
       }
@@ -467,6 +482,16 @@ describe("renderServerComponent (slot emission)", () => {
     expect(
       links.find(link => link.getAttribute("as") === "fetch").getAttribute("crossorigin")
     ).toBe("anonymous");
+    expect(
+      document.head.querySelectorAll(
+        'link[rel="preload"][imagesrcset="/card.avif 1x, /card@2x.avif 2x"]'
+      )
+    ).toHaveLength(2);
+    expect(
+      document.head.querySelector(
+        'link[rel="preload"][imagesrcset="/card.avif 1x, /card@2x.avif 2x"]:not([href])'
+      )
+    ).not.toBeNull();
 
     // A later root assets chunk overwrites the same resident-store key. It is
     // still a new record and must be processed instead of being mistaken for
@@ -503,6 +528,30 @@ describe("renderServerComponent (slot emission)", () => {
       link => link.getAttribute("href") === "/shared.bin" && link.getAttribute("as") === "image"
     );
     expect(links).toHaveLength(1);
+
+    frame.apply({
+      version: 1,
+      r: {
+        "seg:responsive:assets": {
+          type: "assets",
+          key: "responsive",
+          preloads: [
+            {
+              attrs: {
+                as: "image",
+                imagesrcset: "/card.avif 1x, /card@2x.avif 2x",
+                imagesizes: "20rem"
+              }
+            }
+          ]
+        }
+      }
+    });
+    expect(
+      document.head.querySelectorAll(
+        'link[rel="preload"][imagesrcset="/card.avif 1x, /card@2x.avif 2x"]'
+      )
+    ).toHaveLength(2);
 
     // Asset-consumption state is response-scoped. Even a retained record
     // object can be replayed after a version reset if its DOM link vanished.
